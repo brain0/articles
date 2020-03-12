@@ -292,86 +292,90 @@ The problem is that the vtable has to be generated at compile time and the compi
 
 I can see two solutions to this:
 
-1. Change the layout of the vtable so that the vtables of supertraits are sub-tables of the main vtable. As far as I know, this is what C++ compilers do. For the following traits ...
+### Solution 1
 
-   ```rust
-   trait Super { /* ... */ }
-   trait Sub: Super { /* ... */ }
-   ```
+Change the layout of the vtable so that the vtables of supertraits are sub-tables of the main vtable. As far as I know, this is what C++ compilers do. For the following traits ...
 
-   ... a vtable of `Sub` would look like this:
+```rust
+trait Super { /* ... */ }
+trait Sub: Super { /* ... */ }
+```
 
-   | Field | Type |
-   | --- | --- |
-   | `drop_in_place` implementation | Pointer|
-   | size of the value | usize |
-   | minimum alignment of the value | usize |
-   | first trait function of `Super` | Pointer |
-   | ... | ... |
-   | n'th trait function of `Super` | Pointer |
-   | first trait function of `Sub` | Pointer |
-   | ... | ... |
-   | m'th trait function of `Sub` | Pointer |
+... a vtable of `Sub` would look like this:
 
-   Then you can use the same vtable pointer when upcasting `Sub` to `Super`.
+| Field | Type |
+| --- | --- |
+| `drop_in_place` implementation | Pointer|
+| size of the value | usize |
+| minimum alignment of the value | usize |
+| first trait function of `Super` | Pointer |
+| ... | ... |
+| n'th trait function of `Super` | Pointer |
+| first trait function of `Sub` | Pointer |
+| ... | ... |
+| m'th trait function of `Sub` | Pointer |
 
-   The problem here is that as soon as any trait in the chain has more than one supertrait, you'd have to repeat the `drop_in_place` pointer, the size and the alignment multiple times to allow upcasting to all possible supertraits. Consider the following traits ...
+Then you can use the same vtable pointer when upcasting `Sub` to `Super`.
 
-   ```rust
-   trait Super1 { /* ... */ }
-   trait Super2 { /* ... */ }
-   trait Sub: Super1 + Super2 { /* ... */ }
-   ```
+The problem here is that as soon as any trait in the chain has more than one supertrait, you'd have to repeat the `drop_in_place` pointer, the size and the alignment multiple times to allow upcasting to all possible supertraits. Consider the following traits ...
 
+```rust
+trait Super1 { /* ... */ }
+trait Super2 { /* ... */ }
+trait Sub: Super1 + Super2 { /* ... */ }
+```
+
+| | Field | Type |
+| ---: | --- | --- |
+| *vtable of `Sub` and `Super1` ->* | `drop_in_place` implementation | Pointer|
+| | size of the value | usize |
+| | minimum alignment of the value | usize |
+| | first trait function of `Super1` | Pointer |
+| | ... | ... |
+| | m'th trait function of `Super1` | Pointer |
+| *vtable of `Super2` ->* | `drop_in_place` implementation | Pointer|
+| | size of the value | usize |
+| | minimum alignment of the value | usize |
+| | first trait function of `Super2` | Pointer |
+| | ... | ... |
+| | n'th trait function of `Super2` | Pointer |
+| | first trait function of `Sub` | Pointer |
+| | ... | ... |
+| | o'th trait function of `Sub` | Pointer |
+
+This way, the compiler would still be able to determine a vtable of both `Super1` and `Super2` from a vtable of `Sub`. However, this gets pretty complex when more traits are involved.
    
-   | | Field | Type |
-   | ---: | --- | --- |
-   | *vtable of `Sub` and `Super1` ->* | `drop_in_place` implementation | Pointer|
-   | | size of the value | usize |
-   | | minimum alignment of the value | usize |
-   | | first trait function of `Super1` | Pointer |
-   | | ... | ... |
-   | | m'th trait function of `Super1` | Pointer |
-   | *vtable of `Super2` ->* | `drop_in_place` implementation | Pointer|
-   | | size of the value | usize |
-   | | minimum alignment of the value | usize |
-   | | first trait function of `Super2` | Pointer |
-   | | ... | ... |
-   | | n'th trait function of `Super2` | Pointer |
-   | | first trait function of `Sub` | Pointer |
-   | | ... | ... |
-   | | o'th trait function of `Sub` | Pointer |
+This is also part of why C++ class inheritance is so complex and I can understand why rustc developers would not want this complexity.
 
-   This way, the compiler would still be able to determine a vtable of both `Super1` and `Super2` from a vtable of `Sub`. However, this gets pretty complex when more traits are involved.
-   
-   This is also part of why C++ class inheritance is so complex and I can understand why rustc developers would not want this complexity.
-2. When creating a vtable, generate the vtables of all possible supertraits, and include pointers to those supertrait vtables in the vtable itself.
+### Solution 2
 
-   | Field | Type |
-   | --- | --- |
-   | `drop_in_place` implementation | Pointer|
-   | size of the value | usize |
-   | minimum alignment of the value | usize |
-   | vtable of `Super1` | Pointer |
-   | vtable of `Super2` | Pointer
-   | first trait function of `Super1` | Pointer |
-   | ... | ... |
-   | m'th trait function of `Super1` | Pointer |
-   | `drop_in_place` implementation | Pointer|
-   | size of the value | usize |
-   | minimum alignment of the value | usize |
-   | first trait function of `Super2` | Pointer |
-   | ... | ... |
-   | n'th trait function of `Super2` | Pointer |
-   | first trait function of `Sub` | Pointer |
-   | ... | ... |
-   | o'th trait function of `Sub` | Pointer |
+When creating a vtable, generate the vtables of all possible supertraits, and include pointers to those supertrait vtables in the vtable itself.
 
-   This is not nearly as complex and would (probably unnecessarily) increase binary size.
+| Field | Type |
+| --- | --- |
+| `drop_in_place` implementation | Pointer|
+| size of the value | usize |
+| minimum alignment of the value | usize |
+| vtable of `Super1` | Pointer |
+| vtable of `Super2` | Pointer
+| first trait function of `Super1` | Pointer |
+| ... | ... |
+| m'th trait function of `Super1` | Pointer |
+| `drop_in_place` implementation | Pointer|
+| size of the value | usize |
+| minimum alignment of the value | usize |
+| first trait function of `Super2` | Pointer |
+| ... | ... |
+| n'th trait function of `Super2` | Pointer |
+| first trait function of `Sub` | Pointer |
+| ... | ... |
+| o'th trait function of `Sub` | Pointer |
+
+This is not nearly as complex and would (probably unnecessarily) increase binary size.
 
 You could also combine these solutions and choose solution 1. where easily possible, but fall back to solution 2. otherwise. Both of these solutions add complexity to the compiler that may be undesirable.
 
-## A solution
+## A practical solution
 
 Due to the added complexity, I am unsure if Rust will ever allow upcasting trait objects. After all, I seem to be the first one to have cared about this.
 
