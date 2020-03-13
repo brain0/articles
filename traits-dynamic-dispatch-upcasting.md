@@ -377,7 +377,9 @@ You could also combine these solutions and choose solution 1. where easily possi
 
 ## A practical solution
 
-Due to the added complexity, I am unsure if Rust will ever allow upcasting trait objects. After all, I seem to be the first one to have cared about this.
+Due to the added complexity, I am unsure if Rust will ever allow upcasting trait objects. ~~After all, I seem to be the first one to have cared about this.~~
+
+(It seems that I may have been wrong about this. There is a [tracking issue](https://github.com/rust-lang/rust/issues/65991) and an experimental [pull request](https://github.com/rust-lang/rust/pull/60900) about this topic.)
 
 However, there is a neat trick to solve this problem, at least for traits that you define yourself.
 
