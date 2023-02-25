@@ -187,7 +187,7 @@ We'll explore the vtable in more detail.
 
 ## Trait objects and the vtable
 
-The vtable is what allows Rust to call trait methods on a value without knowing its type. The vtable is generated at compile time and stored as part of the binary. As of Rust 1.43, the layout of the vtable is as follows (although rustc makes no guarantess about it):
+The vtable is what allows Rust to call trait methods on a value without knowing its type. The vtable is generated at compile time and stored as part of the binary. As of Rust 1.43, the layout of the vtable is as follows (although rustc makes no guarantees about it):
 
 | Field | Type |
 | --- | --- |
